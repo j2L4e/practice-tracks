@@ -97,11 +97,12 @@ function App() {
   return (
     <div className="App">
       <h1>Stereo Practice Tracks</h1>
-      <p className="description">
+      <div className="description">
         Upload multiple MP3 files to create practice tracks.
-        For each file, a new track will be generated where the <strong>Left Channel</strong>
-        contains that individual part and the <strong>Right Channel</strong> contains a mix of all other parts.
-      </p>
+        For each file, a new track will be generated.
+        <div><strong>Left Channel</strong> contains that individual part.</div>
+        <div><strong>Right Channel</strong> contains a mix of all other parts.</div>
+      </div>
 
       {!loaded ? (
         <div className="loading">
