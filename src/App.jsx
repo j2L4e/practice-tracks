@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
+import JSZip from 'jszip'
+import { saveAs } from 'file-saver'
 import './App.css'
 
 function App() {
@@ -83,8 +85,8 @@ function App() {
         const data = await ffmpeg.readFile(outputName)
         const url = URL.createObjectURL(new Blob([data.buffer], { type: 'audio/mpeg' }))
         processedResults.push({ name: currentFile.name, url })
-        setResults([...processedResults])
       }
+      setResults(processedResults)
     } catch (error) {
       console.error(error)
       alert('Error processing files: ' + error.message)
@@ -92,6 +94,19 @@ function App() {
       setProcessing(false)
       setCurrentTask('')
     }
+  }
+
+  const downloadAllAsZip = async () => {
+    const zip = new JSZip()
+
+    for (const result of results) {
+      const response = await fetch(result.url)
+      const blob = await response.blob()
+      zip.file(`processed_${result.name}`, blob)
+    }
+
+    const content = await zip.generateAsync({ type: 'blob' })
+    saveAs(content, 'stereo_practice_tracks.zip')
   }
 
   return (
@@ -125,7 +140,15 @@ function App() {
           )}
 
           <div className="results">
-            {results.map((result, idx) => (
+            {(!processing && results.length > 0) && (
+              <div className="results-header">
+                <h3>Processed Files</h3>
+                <button onClick={downloadAllAsZip} className="download-all-btn">
+                  Download All as ZIP
+                </button>
+              </div>
+            )}
+            {(!processing && results.length > 0) && results.map((result, idx) => (
               <div key={idx} className="result-item">
                 <span>{result.name}</span>
                 <audio controls src={result.url}></audio>

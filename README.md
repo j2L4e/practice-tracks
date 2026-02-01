@@ -21,7 +21,7 @@ This setup is ideal for choir or ensemble members who want to hear their own par
 2. Wait for FFmpeg to initialize (happens automatically).
 3. Upload your MP3 tracks.
 4. Click **Generate Practice Tracks**.
-5. Listen to the results or download them.
+5. Listen to the results or download them (individually or as a ZIP).
 
 ## Development
 

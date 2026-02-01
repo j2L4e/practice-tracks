@@ -57,6 +57,23 @@ progress::-moz-progress-bar {
   margin-top: 2rem;
 }
 
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding: 0 0.5rem;
+}
+
+.download-all-btn {
+  background-color: #646cff;
+  color: white;
+}
+
+.download-all-btn:hover {
+  background-color: #535bf2;
+}
+
 .result-item {
   display: flex;
   align-items: center;
