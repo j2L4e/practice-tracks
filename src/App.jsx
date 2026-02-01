@@ -12,6 +12,7 @@ function App() {
   const [results, setResults] = useState([])
   const [progress, setProgress] = useState(0)
   const [currentTask, setCurrentTask] = useState('')
+  const [volumeBalance, setVolumeBalance] = useState(50)
   const ffmpegRef = useRef(new FFmpeg())
 
   useEffect(() => {
@@ -65,12 +66,15 @@ function App() {
           inputArgs.push('-i', other.name)
         }
 
-        let filterComplex = `[0:a]pan=mono|c0=0.5*c0+0.5*c1[left]`
+        const leftGain = ((100 - volumeBalance) / 50).toFixed(2)
+        const rightGain = (volumeBalance / 50).toFixed(2)
+
+        let filterComplex = `[0:a]pan=mono|c0=0.5*c0+0.5*c1,volume=${leftGain}[left]`
         if (otherFiles.length > 0) {
           const otherIndices = otherFiles.map((_, idx) => `[${idx + 1}:a]`).join('')
-          filterComplex += `;${otherIndices}amix=inputs=${otherFiles.length}:dropout_transition=0:normalize=0,pan=mono|c0=c0[right]`
+          filterComplex += `;${otherIndices}amix=inputs=${otherFiles.length}:dropout_transition=0:normalize=0,pan=mono|c0=c0,volume=${rightGain}[right]`
         } else {
-          filterComplex += `;anullsrc=r=44100:cl=mono[right]`
+          filterComplex += `;anullsrc=r=44100:cl=mono,volume=${rightGain}[right]`
         }
         filterComplex += `;[left][right]amerge=inputs=2[out]`
 
@@ -126,7 +130,30 @@ function App() {
         </div>
       ) : (
         <div className="container">
-          <input type="file" multiple accept="audio/mpeg" onChange={handleFileChange} disabled={processing} />
+          <div className="controls">
+            <div className="file-input-wrapper">
+              <label>Upload MP3 files:</label>
+              <input type="file" multiple accept="audio/mpeg" onChange={handleFileChange} disabled={processing} />
+            </div>
+
+            <div className="volume-slider-wrapper">
+              <div className="slider-labels">
+                <span>Part only</span>
+                <span>Balanced</span>
+                <span>Ensemble only</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={volumeBalance}
+                onChange={(e) => setVolumeBalance(Number(e.target.value))}
+                disabled={processing}
+                className="volume-slider"
+              />
+            </div>
+          </div>
+
           <button onClick={processFiles} disabled={files.length === 0 || processing}>
             {processing ? 'Processing...' : 'Generate Practice Tracks'}
           </button>
@@ -135,7 +162,6 @@ function App() {
             <div className="status">
               <p>{currentTask}</p>
               <progress value={progress} max="100" />
-              <span>{progress}%</span>
             </div>
           )}
 

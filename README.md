@@ -13,6 +13,7 @@ This setup is ideal for choir or ensemble members who want to hear their own par
 
 ## Features
 - **In-Browser Processing**: Uses FFmpeg directly in your browser. No files are uploaded to any server.
+- **Volume Balance Control**: Adjust the volume ratio between your individual part and the ensemble mix.
 - **High Quality**: Uses high-quality encoding for the processed audio.
 - **Privacy**: All processing happens locally on your machine.
 
@@ -20,8 +21,9 @@ This setup is ideal for choir or ensemble members who want to hear their own par
 1. Open the application.
 2. Wait for FFmpeg to initialize (happens automatically).
 3. Upload your MP3 tracks.
-4. Click **Generate Practice Tracks**.
-5. Listen to the results or download them (individually or as a ZIP).
+4. Adjust the **Volume Balance** slider if needed (left = individual part only, right = ensemble only).
+5. Click **Generate Practice Tracks**.
+6. Listen to the results or download them (individually or as a ZIP).
 
 ## Development
 
@@ -45,6 +47,6 @@ The project is automatically built and deployed to GitHub Pages via GitHub Actio
 
 ## Technical Details
 The application uses FFmpeg's `filter_complex` to:
-1. **Left Channel**: Downmix the current stereo file to mono using `pan=mono|c0=0.5*c0+0.5*c1`.
-2. **Right Channel**: Mix all other files using `amix`, then downmix the result to mono.
+1. **Left Channel**: Downmix the current stereo file to mono and apply gain based on the volume balance.
+2. **Right Channel**: Mix all other files using `amix`, downmix to mono, and apply gain based on the volume balance.
 3. **Merge**: Combine the two mono streams into a single stereo output using `amerge`.
