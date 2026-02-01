@@ -12,6 +12,7 @@ For each uploaded MP3 file, the application generates a stereo track where:
 This setup is ideal for choir or ensemble members who want to hear their own part clearly while still being able to practice with the rest of the ensemble.
 
 ## Features
+- **Parallel Processing**: Processes multiple files simultaneously using multiple FFmpeg instances for faster results.
 - **In-Browser Processing**: Uses FFmpeg directly in your browser. No files are uploaded to any server.
 - **Volume Balance Control**: Adjust the volume ratio between your individual part and the ensemble mix.
 - **High Quality**: Uses high-quality encoding for the processed audio.

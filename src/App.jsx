@@ -10,58 +10,86 @@ function App() {
   const [files, setFiles] = useState([])
   const [processing, setProcessing] = useState(false)
   const [results, setResults] = useState([])
-  const [progress, setProgress] = useState(0)
+  const [progress, setProgress] = useState({})
   const [currentTask, setCurrentTask] = useState('')
   const [volumeBalance, setVolumeBalance] = useState(50)
-  const ffmpegRef = useRef(new FFmpeg())
+  const ffmpegInstancesRef = useRef([])
 
   useEffect(() => {
-    load()
+    const init = async () => {
+      // Warm up one instance to check if it's ready and to show "loaded" state
+      const ffmpeg = new FFmpeg()
+      const baseURL = import.meta.env.BASE_URL
+      try {
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}ffmpeg-core.wasm`, 'application/wasm'),
+          workerURL: await toBlobURL(`${baseURL}ffmpeg-core.worker.js`, 'text/javascript'),
+        })
+        setLoaded(true)
+        ffmpeg.terminate()
+      } catch (e) {
+        console.error("Failed to load FFmpeg", e)
+      }
+    }
+    init()
+
+    return () => {
+      // Cleanup: terminate all ffmpeg instances on unmount
+      ffmpegInstancesRef.current.forEach(f => f.terminate())
+    }
   }, [])
 
-  const load = async () => {
+  const createFFmpegInstance = async () => {
+    const ffmpeg = new FFmpeg()
     const baseURL = import.meta.env.BASE_URL
-    const ffmpeg = ffmpegRef.current
-    ffmpeg.on('log', ({ message }) => {
-      console.log(message)
-    })
-    ffmpeg.on('progress', ({ progress }) => {
-      setProgress(Math.round(progress * 100))
-    })
+
     // toBlobURL is used to bypass CORS issues for the worker and core.
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${baseURL}ffmpeg-core.wasm`, 'application/wasm'),
+      workerURL: await toBlobURL(`${baseURL}ffmpeg-core.worker.js`, 'text/javascript'),
     })
-    setLoaded(true)
-  }
 
-  const handleFileChange = (e) => {
-    setFiles(Array.from(e.target.files))
+    return ffmpeg
   }
 
   const processFiles = async () => {
-    if (!loaded) return
     setProcessing(true)
     setResults([])
-    const ffmpeg = ffmpegRef.current
-    const processedResults = []
 
-    try {
-      // Write all files to FFmpeg FS
-      for (const file of files) {
-        await ffmpeg.writeFile(file.name, await fetchFile(file))
+    // Initialize progress for all files to 0%
+    const initialProgress = {}
+    files.forEach(file => {
+      initialProgress[file.name] = 0
+    })
+    setProgress(initialProgress)
+
+    setCurrentTask('Initializing parallel workers...')
+
+    const processedResults = []
+    const concurrencyLimit = Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) / 4))
+    const queue = [...files]
+    const activeTasks = []
+
+    const processFile = async (file, ffmpeg, index) => {
+      const progressHandler = ({ progress: p }) => {
+        setProgress(prev => ({ ...prev, [file.name]: Math.round(p * 100) }))
       }
 
-      for (let i = 0; i < files.length; i++) {
-        const currentFile = files[i]
-        const otherFiles = files.filter((_, index) => index !== i)
-        const outputName = `processed_${currentFile.name}`
+      try {
+        const otherFiles = files.filter(f => f.name !== file.name)
+        const outputName = `processed_${file.name}`
 
-        setCurrentTask(`Processing ${currentFile.name}...`)
-        setProgress(0)
+        ffmpeg.on('progress', progressHandler)
 
-        const inputArgs = ['-i', currentFile.name]
+        // Write all necessary files to this instance's FS
+        await ffmpeg.writeFile(file.name, await fetchFile(file))
+        for (const other of otherFiles) {
+          await ffmpeg.writeFile(other.name, await fetchFile(other))
+        }
+
+        const inputArgs = ['-i', file.name]
         for (const other of otherFiles) {
           inputArgs.push('-i', other.name)
         }
@@ -79,6 +107,7 @@ function App() {
         filterComplex += `;[left][right]amerge=inputs=2[out]`
 
         await ffmpeg.exec([
+          // '-threads', '0',
           ...inputArgs,
           '-filter_complex', filterComplex,
           '-map', '[out]',
@@ -88,15 +117,59 @@ function App() {
 
         const data = await ffmpeg.readFile(outputName)
         const url = URL.createObjectURL(new Blob([data.buffer], { type: 'audio/mpeg' }))
-        processedResults.push({ name: currentFile.name, url })
+        processedResults.push({ name: file.name, url, index })
+
+        // Cleanup FS
+        await ffmpeg.deleteFile(file.name)
+        for (const other of otherFiles) {
+          await ffmpeg.deleteFile(other.name)
+        }
+        await ffmpeg.deleteFile(outputName)
+
+      } catch (err) {
+        console.error(`Error processing ${file.name}:`, err)
+        throw err
+      } finally {
+        ffmpeg.off('progress', progressHandler)
       }
-      setResults(processedResults)
+    }
+
+    const workers = []
+    const numWorkers = Math.min(files.length, concurrencyLimit)
+
+    try {
+      // Create workers
+      for (let i = 0; i < numWorkers; i++) {
+        const ffmpeg = await createFFmpegInstance()
+        ffmpegInstancesRef.current.push(ffmpeg)
+        workers.push(ffmpeg)
+      }
+
+      setCurrentTask(`Processing ${files.length} files in parallel...`)
+
+      const runWorker = async (ffmpeg) => {
+        while (queue.length > 0) {
+          const file = queue.shift()
+          const originalIndex = files.indexOf(file)
+          await processFile(file, ffmpeg, originalIndex)
+        }
+      }
+
+      await Promise.all(workers.map(runWorker))
+
+      // Sort results back to original order
+      processedResults.sort((a, b) => a.index - b.index)
+      setResults(processedResults.map(({ name, url }) => ({ name, url })))
+
     } catch (error) {
       console.error(error)
       alert('Error processing files: ' + error.message)
     } finally {
       setProcessing(false)
       setCurrentTask('')
+      // Terminate and clear workers to free memory
+      ffmpegInstancesRef.current.forEach(f => f.terminate())
+      ffmpegInstancesRef.current = []
     }
   }
 
@@ -111,6 +184,13 @@ function App() {
 
     const content = await zip.generateAsync({ type: 'blob' })
     saveAs(content, 'stereo_practice_tracks.zip')
+  }
+
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      setFiles(Array.from(e.target.files))
+      setResults([]) // Reset results when new files are selected
+    }
   }
 
   return (
@@ -161,7 +241,12 @@ function App() {
           {processing && (
             <div className="status">
               <p>{currentTask}</p>
-              <progress value={progress} max="100" />
+              {files.map((file) => (
+                <div key={file.name} className="progress-item">
+                  <div className="progress-label">{file.name}</div>
+                  <progress value={progress[file.name] || 0} max="100" />
+                </div>
+              ))}
             </div>
           )}
 
