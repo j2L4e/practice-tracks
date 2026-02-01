@@ -17,7 +17,7 @@ function App() {
   }, [])
 
   const load = async () => {
-    const baseURL = window.location.origin
+    const baseURL = import.meta.env.BASE_URL
     const ffmpeg = ffmpegRef.current
     ffmpeg.on('log', ({ message }) => {
       console.log(message)
@@ -27,8 +27,8 @@ function App() {
     })
     // toBlobURL is used to bypass CORS issues for the worker and core.
     await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      coreURL: await toBlobURL(`${baseURL}ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${baseURL}ffmpeg-core.wasm`, 'application/wasm'),
     })
     setLoaded(true)
   }
