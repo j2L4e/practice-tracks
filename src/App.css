@@ -5,6 +5,18 @@
   box-sizing: border-box;
 }
 
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.logo {
+  height: 4em;
+}
+
 .container {
   display: flex;
   flex-direction: column;

@@ -195,7 +195,10 @@ function App() {
 
   return (
     <div className="App">
-      <h1>Stereo Practice Tracks</h1>
+      <div className="header">
+        <img src={`${import.meta.env.BASE_URL}logo.svg`} className="logo" alt="Stereo Practice Tracks Logo" />
+        <h1>Stereo Practice Tracks</h1>
+      </div>
       <div className="description">
         Upload multiple MP3 files to create practice tracks.
         For each file, a new track will be generated.
